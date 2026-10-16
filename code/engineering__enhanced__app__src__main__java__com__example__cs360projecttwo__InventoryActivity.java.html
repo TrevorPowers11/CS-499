@@ -1,0 +1,428 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>engineering/enhanced/app/src/main/java/com/example/cs360projecttwo/InventoryActivity.java | Trevor Powers</title><meta name="description" content="Trevor Powers CS 499 computer science portfolio with original and enhanced code, narratives, and code review."><link rel="stylesheet" href="../style.css"></head><body><a class="skip" href="#main">Skip to content</a><header class="hero"><div class="container"><p class="eyebrow">CS 499 Computer Science Capstone</p><h1>Trevor Powers</h1><h2>engineering/enhanced/app/src/main/java/com/example/cs360projecttwo/InventoryActivity.java</h2><nav aria-label="Main navigation"><a href="../index.html">Portfolio home</a><a href="../index.html#artifacts">Artifacts</a><a href="../setup.html">Setup and testing</a></nav></div></header><main id="main" class="container"><section class="card"><h2>engineering/enhanced/app/src/main/java/com/example/cs360projecttwo/InventoryActivity.java</h2><p><a href="../engineering_code.html">Back to source list</a></p><pre><code>package com.example.cs360projecttwo;
+
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.os.Bundle;
+import android.telephony.SmsManager;
+import android.text.TextUtils;
+import android.util.Patterns;
+import android.view.Gravity;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
+
+import java.util.List;
+
+public class InventoryActivity extends AppCompatActivity {
+
+    private EditText itemNameEditText;
+    private EditText itemQuantityEditText;
+    private EditText phoneNumberEditText;
+    private LinearLayout inventoryContainer;
+    private Button addItemButton;
+
+    private DatabaseHelper databaseHelper;
+
+    private int userId;
+    private int editingItemId = -1;
+
+    private final ActivityResultLauncher&lt;String&gt; smsPermissionLauncher =
+            registerForActivityResult(
+                    new ActivityResultContracts.RequestPermission(),
+                    granted -&gt; {
+
+                        if (granted) {
+                            showMessage(&quot;SMS notifications enabled.&quot;);
+                        } else {
+                            showMessage(
+                                    &quot;SMS permission denied. Inventory features still work.&quot;
+                            );
+                        }
+                    }
+            );
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_inventory);
+
+        userId = getIntent().getIntExtra(
+                &quot;USER_ID&quot;,
+                -1
+        );
+
+        if (userId == -1) {
+            showMessage(&quot;Unable to load user account.&quot;);
+            finish();
+            return;
+        }
+
+        databaseHelper = new DatabaseHelper(this);
+
+        itemNameEditText =
+                findViewById(R.id.itemNameEditText);
+
+        itemQuantityEditText =
+                findViewById(R.id.itemQuantityEditText);
+
+        phoneNumberEditText =
+                findViewById(R.id.phoneNumberEditText);
+
+        inventoryContainer =
+                findViewById(R.id.inventoryContainer);
+
+        addItemButton =
+                findViewById(R.id.addItemButton);
+
+        Button smsPermissionButton =
+                findViewById(R.id.smsPermissionButton);
+
+        addItemButton.setOnClickListener(
+                v -&gt; saveInventoryItem()
+        );
+
+        smsPermissionButton.setOnClickListener(
+                v -&gt; requestSmsPermission()
+        );
+
+        displayInventoryItems();
+    }
+
+    private void saveInventoryItem() {
+
+        String itemName =
+                itemNameEditText
+                        .getText()
+                        .toString()
+                        .trim();
+
+        String quantityText =
+                itemQuantityEditText
+                        .getText()
+                        .toString()
+                        .trim();
+
+        if (TextUtils.isEmpty(itemName)
+                || TextUtils.isEmpty(quantityText)) {
+
+            showMessage(
+                    &quot;Enter an item name and quantity.&quot;
+            );
+            return;
+        }
+
+        if (itemName.length() &gt; 50) {
+            showMessage(
+                    &quot;Item name must be 50 characters or less.&quot;
+            );
+            return;
+        }
+
+        int quantity;
+
+        try {
+            quantity = Integer.parseInt(quantityText);
+        } catch (NumberFormatException e) {
+            showMessage(
+                    &quot;Quantity must be a valid number.&quot;
+            );
+            return;
+        }
+
+        if (quantity &lt; 0) {
+            showMessage(
+                    &quot;Quantity cannot be negative.&quot;
+            );
+            return;
+        }
+
+        boolean success;
+
+        if (editingItemId == -1) {
+
+            success = databaseHelper.addInventoryItem(
+                    userId,
+                    itemName,
+                    quantity
+            );
+
+            if (success) {
+                showMessage(&quot;Item added.&quot;);
+            } else {
+                showMessage(&quot;Unable to add item.&quot;);
+                return;
+            }
+
+        } else {
+
+            success = databaseHelper.updateInventoryItem(
+                    editingItemId,
+                    itemName,
+                    quantity
+            );
+
+            if (success) {
+                showMessage(&quot;Item updated.&quot;);
+                editingItemId = -1;
+                addItemButton.setText(&quot;Add Item&quot;);
+            } else {
+                showMessage(&quot;Unable to update item.&quot;);
+                return;
+            }
+        }
+
+        if (quantity &lt;= 5) {
+            sendLowStockAlert(
+                    itemName,
+                    quantity
+            );
+        }
+
+        itemNameEditText.setText(&quot;&quot;);
+        itemQuantityEditText.setText(&quot;&quot;);
+
+        itemNameEditText.requestFocus();
+
+        displayInventoryItems();
+    }
+
+    private void displayInventoryItems() {
+
+        inventoryContainer.removeAllViews();
+
+        List&lt;DatabaseHelper.InventoryItem&gt; items =
+                databaseHelper.getInventoryItems(userId);
+
+        for (DatabaseHelper.InventoryItem item : items) {
+            addInventoryRow(item);
+        }
+    }
+
+    private void addInventoryRow(
+            DatabaseHelper.InventoryItem item
+    ) {
+
+        LinearLayout itemRow =
+                new LinearLayout(this);
+
+        itemRow.setOrientation(
+                LinearLayout.HORIZONTAL
+        );
+
+        itemRow.setPadding(
+                8,
+                12,
+                8,
+                12
+        );
+
+        itemRow.setGravity(
+                Gravity.CENTER_VERTICAL
+        );
+
+        TextView itemNameTextView =
+                new TextView(this);
+
+        itemNameTextView.setText(item.name);
+
+        itemNameTextView.setLayoutParams(
+                new LinearLayout.LayoutParams(
+                        0,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        2
+                )
+        );
+
+        TextView quantityTextView =
+                new TextView(this);
+
+        quantityTextView.setText(
+                String.valueOf(item.quantity)
+        );
+
+        quantityTextView.setGravity(
+                Gravity.CENTER
+        );
+
+        quantityTextView.setLayoutParams(
+                new LinearLayout.LayoutParams(
+                        0,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        1
+                )
+        );
+
+        Button editButton =
+                new Button(this);
+
+        editButton.setText(&quot;Edit&quot;);
+        editButton.setTextSize(11);
+
+        editButton.setLayoutParams(
+                new LinearLayout.LayoutParams(
+                        0,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        1
+                )
+        );
+
+        editButton.setOnClickListener(v -&gt; {
+
+            editingItemId = item.id;
+
+            itemNameEditText.setText(
+                    item.name
+            );
+
+            itemQuantityEditText.setText(
+                    String.valueOf(item.quantity)
+            );
+
+            addItemButton.setText(
+                    &quot;Save Update&quot;
+            );
+
+            itemNameEditText.requestFocus();
+        });
+
+        Button removeButton =
+                new Button(this);
+
+        removeButton.setText(&quot;Remove&quot;);
+        removeButton.setTextSize(11);
+
+        removeButton.setLayoutParams(
+                new LinearLayout.LayoutParams(
+                        0,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        1
+                )
+        );
+
+        removeButton.setOnClickListener(v -&gt; {
+
+            boolean deleted =
+                    databaseHelper.deleteInventoryItem(
+                            item.id
+                    );
+
+            if (deleted) {
+                showMessage(&quot;Item removed.&quot;);
+                displayInventoryItems();
+            } else {
+                showMessage(
+                        &quot;Unable to remove item.&quot;
+                );
+            }
+        });
+
+        itemRow.addView(itemNameTextView);
+        itemRow.addView(quantityTextView);
+        itemRow.addView(editButton);
+        itemRow.addView(removeButton);
+
+        inventoryContainer.addView(itemRow);
+    }
+
+    private void requestSmsPermission() {
+
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.SEND_SMS
+        ) == PackageManager.PERMISSION_GRANTED) {
+
+            showMessage(
+                    &quot;SMS notifications are already enabled.&quot;
+            );
+
+        } else {
+
+            smsPermissionLauncher.launch(
+                    Manifest.permission.SEND_SMS
+            );
+        }
+    }
+
+    private void sendLowStockAlert(
+            String itemName,
+            int quantity
+    ) {
+
+        String phoneNumber =
+                phoneNumberEditText
+                        .getText()
+                        .toString()
+                        .trim();
+
+        if (phoneNumber.isEmpty()) {
+            return;
+        }
+
+        if (!Patterns.PHONE
+                .matcher(phoneNumber)
+                .matches()) {
+
+            showMessage(
+                    &quot;Enter a valid phone number.&quot;
+            );
+            return;
+        }
+
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.SEND_SMS
+        ) != PackageManager.PERMISSION_GRANTED) {
+
+            showMessage(
+                    &quot;Low stock detected. Enable SMS to receive an alert.&quot;
+            );
+            return;
+        }
+
+        try {
+
+            String message =
+                    &quot;Inventory alert: &quot;
+                            + itemName
+                            + &quot; is low. Remaining quantity: &quot;
+                            + quantity
+                            + &quot;.&quot;;
+
+            SmsManager.getDefault()
+                    .sendTextMessage(
+                            phoneNumber,
+                            null,
+                            message,
+                            null,
+                            null
+                    );
+
+            showMessage(
+                    &quot;Low-stock SMS alert sent.&quot;
+            );
+
+        } catch (Exception exception) {
+
+            showMessage(
+                    &quot;Unable to send SMS on this device.&quot;
+            );
+        }
+    }
+
+    private void showMessage(String message) {
+
+        Toast.makeText(
+                this,
+                message,
+                Toast.LENGTH_SHORT
+        ).show();
+    }
+}</code></pre></section></main><footer>Trevor Powers · Southern New Hampshire University · 2026</footer></body></html>

@@ -1,0 +1,75 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>databases/original/ModuleFiveAssignment.ipynb | Trevor Powers</title><meta name="description" content="Trevor Powers CS 499 computer science portfolio with original and enhanced code, narratives, and code review."><link rel="stylesheet" href="../style.css"></head><body><a class="skip" href="#main">Skip to content</a><header class="hero"><div class="container"><p class="eyebrow">CS 499 Computer Science Capstone</p><h1>Trevor Powers</h1><h2>databases/original/ModuleFiveAssignment.ipynb</h2><nav aria-label="Main navigation"><a href="../index.html">Portfolio home</a><a href="../index.html#artifacts">Artifacts</a><a href="../setup.html">Setup and testing</a></nav></div></header><main id="main" class="container"><section class="card"><h2>databases/original/ModuleFiveAssignment.ipynb</h2><p><a href="../databases_code.html">Back to source list</a></p><pre><code># Cell 1
+# DASH Framework for Jupyter
+from jupyter_dash import JupyterDash
+from dash import dcc, html
+from dash.dependencies import Input, Output
+JupyterDash.infer_jupyter_proxy_config()
+
+import urllib.parse
+
+# Import existing Project One CRUD module
+from CRUD_Python_Module import AnimalShelter
+
+# Build App
+app = JupyterDash(__name__)
+
+app.layout = html.Div([
+    html.H1(&quot;Module 5 Assignment - Trevor Powers&quot;),
+
+    dcc.Input(
+        id=&quot;input_user&quot;,
+        type=&quot;text&quot;,
+        placeholder=&quot;Username&quot;
+    ),
+
+    dcc.Input(
+        id=&quot;input_passwd&quot;,
+        type=&quot;password&quot;,
+        placeholder=&quot;Password&quot;
+    ),
+
+    html.Button(&quot;Submit&quot;, id=&quot;submit-val&quot;, n_clicks=0),
+
+    html.Hr(),
+
+    html.Div(id=&quot;query-out&quot;, style={&quot;whiteSpace&quot;: &quot;pre-line&quot;})
+])
+
+# Dashboard callback
+@app.callback(
+    Output(&quot;query-out&quot;, &quot;children&quot;),
+    [
+        Input(&quot;input_user&quot;, &quot;value&quot;),
+        Input(&quot;input_passwd&quot;, &quot;value&quot;),
+        Input(&quot;submit-val&quot;, &quot;n_clicks&quot;)
+    ]
+)
+def update_figure(inputUser, inputPass, n_clicks):
+
+    if n_clicks &gt; 0:
+        try:
+            username = urllib.parse.quote_plus(inputUser)
+            password = urllib.parse.quote_plus(inputPass)
+
+            shelter = AnimalShelter(username, password)
+
+            results = shelter.read({
+                &quot;animal_type&quot;: &quot;Dog&quot;,
+                &quot;name&quot;: &quot;Lucy&quot;
+            })
+
+            if results:
+                return &quot;\n\n&quot;.join(str(result) for result in results)
+
+            return &quot;No matching records found.&quot;
+
+        except Exception as error:
+            return &quot;Error: &quot; + str(error)
+
+    return &quot;Enter your username and password, then click Submit.&quot;
+
+
+app.run_server(mode=&quot;inline&quot;)
+
+# Cell 2
+</code></pre></section></main><footer>Trevor Powers · Southern New Hampshire University · 2026</footer></body></html>

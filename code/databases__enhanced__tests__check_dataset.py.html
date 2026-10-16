@@ -1,0 +1,31 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>databases/enhanced/tests/check_dataset.py | Trevor Powers</title><meta name="description" content="Trevor Powers CS 499 computer science portfolio with original and enhanced code, narratives, and code review."><link rel="stylesheet" href="../style.css"></head><body><a class="skip" href="#main">Skip to content</a><header class="hero"><div class="container"><p class="eyebrow">CS 499 Computer Science Capstone</p><h1>Trevor Powers</h1><h2>databases/enhanced/tests/check_dataset.py</h2><nav aria-label="Main navigation"><a href="../index.html">Portfolio home</a><a href="../index.html#artifacts">Artifacts</a><a href="../setup.html">Setup and testing</a></nav></div></header><main id="main" class="container"><section class="card"><h2>databases/enhanced/tests/check_dataset.py</h2><p><a href="../databases_code.html">Back to source list</a></p><pre><code>&quot;&quot;&quot;Offline integration check against the supplied AAC CSV; not a speed benchmark.&quot;&quot;&quot;
+import csv
+import sys
+from collections import Counter
+from pathlib import Path
+import mongomock
+from CRUD_Python_Module import AnimalShelter, RULES
+
+path=Path(sys.argv[1])
+with path.open(newline=&#x27;&#x27;) as stream:
+    records=list(csv.DictReader(stream))
+for record in records:
+    for field in (&#x27;location_lat&#x27;,&#x27;location_long&#x27;,&#x27;age_upon_outcome_in_weeks&#x27;):
+        record[field]=float(record[field]) if record[field] else None
+collection=mongomock.MongoClient().aac.animals
+collection.insert_many(records)
+db=AnimalShelter(collection=collection)
+for rescue in (&#x27;RESET&#x27;,*RULES):
+    expected=records
+    if rescue!=&#x27;RESET&#x27;:
+        breeds,sex,low,high=RULES[rescue]
+        expected=[r for r in records if r[&#x27;animal_type&#x27;]==&#x27;Dog&#x27; and r[&#x27;breed&#x27;] in breeds
+                  and r[&#x27;sex_upon_outcome&#x27;]==sex and r[&#x27;age_upon_outcome_in_weeks&#x27;] is not None
+                  and low &lt;= r[&#x27;age_upon_outcome_in_weeks&#x27;] &lt;= high]
+    page=db.read_page(rescue)
+    assert page[&#x27;total&#x27;]==len(expected)
+    counts=Counter(r[&#x27;breed&#x27;] for r in expected)
+    summary=db.summary(rescue)
+    assert [(r[&#x27;category&#x27;],r[&#x27;count&#x27;]) for r in summary]==sorted(counts.items(),key=lambda x:(-x[1],x[0]))[:10]
+    print(f&#x27;{rescue}: {len(expected)} matches; page and full-result summary verified&#x27;)
+</code></pre></section></main><footer>Trevor Powers · Southern New Hampshire University · 2026</footer></body></html>

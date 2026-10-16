@@ -1,0 +1,52 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>databases/original/ModuleFourTestScript.ipynb | Trevor Powers</title><meta name="description" content="Trevor Powers CS 499 computer science portfolio with original and enhanced code, narratives, and code review."><link rel="stylesheet" href="../style.css"></head><body><a class="skip" href="#main">Skip to content</a><header class="hero"><div class="container"><p class="eyebrow">CS 499 Computer Science Capstone</p><h1>Trevor Powers</h1><h2>databases/original/ModuleFourTestScript.ipynb</h2><nav aria-label="Main navigation"><a href="../index.html">Portfolio home</a><a href="../index.html#artifacts">Artifacts</a><a href="../setup.html">Setup and testing</a></nav></div></header><main id="main" class="container"><section class="card"><h2>databases/original/ModuleFourTestScript.ipynb</h2><p><a href="../databases_code.html">Back to source list</a></p><pre><code># Cell 1
+# CS 340 Module Four Milestone
+# Student: Trevor Powers
+
+import importlib
+import CRUD_Python_Module
+
+# Reload the module to use the newest saved version
+importlib.reload(CRUD_Python_Module)
+
+from CRUD_Python_Module import AnimalShelter
+
+# MongoDB authentication
+username = &#x27;REPLACE_WITH_LOCAL_CREDENTIAL&#x27;
+password = &#x27;REPLACE_WITH_LOCAL_CREDENTIAL&#x27;
+# Create an AnimalShelter object
+shelter = AnimalShelter(username, password)
+
+print(&quot;CRUD module imported successfully.&quot;)
+print(&quot;AnimalShelter object created successfully.&quot;)
+
+# Document used to test the create method
+test_document = {
+    &quot;animal_id&quot;: &quot;MODULE4_TREVOR_TEST&quot;,
+    &quot;name&quot;: &quot;Trevor Test Animal&quot;,
+    &quot;animal_type&quot;: &quot;Dog&quot;,
+    &quot;breed&quot;: &quot;Labrador Retriever Mix&quot;,
+    &quot;color&quot;: &quot;Black&quot;,
+    &quot;age_upon_outcome&quot;: &quot;2 years&quot;,
+    &quot;outcome_type&quot;: &quot;Adoption&quot;
+}
+
+# Test create
+create_result = shelter.create(test_document)
+print(&quot;\nCreate method result:&quot;, create_result)
+
+# Test read
+query = {&quot;animal_id&quot;: &quot;MODULE4_TREVOR_TEST&quot;}
+read_result = shelter.read(query)
+
+print(&quot;\nRead method returned a:&quot;, type(read_result))
+print(&quot;Number of matching records:&quot;, len(read_result))
+print(&quot;Matching records:&quot;)
+
+for document in read_result:
+    print(document)
+
+# Cell 2
+
+
+# Cell 3
+</code></pre></section></main><footer>Trevor Powers · Southern New Hampshire University · 2026</footer></body></html>

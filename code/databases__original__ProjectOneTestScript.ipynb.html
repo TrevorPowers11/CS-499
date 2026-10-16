@@ -1,0 +1,78 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>databases/original/ProjectOneTestScript.ipynb | Trevor Powers</title><meta name="description" content="Trevor Powers CS 499 computer science portfolio with original and enhanced code, narratives, and code review."><link rel="stylesheet" href="../style.css"></head><body><a class="skip" href="#main">Skip to content</a><header class="hero"><div class="container"><p class="eyebrow">CS 499 Computer Science Capstone</p><h1>Trevor Powers</h1><h2>databases/original/ProjectOneTestScript.ipynb</h2><nav aria-label="Main navigation"><a href="../index.html">Portfolio home</a><a href="../index.html#artifacts">Artifacts</a><a href="../setup.html">Setup and testing</a></nav></div></header><main id="main" class="container"><section class="card"><h2>databases/original/ProjectOneTestScript.ipynb</h2><p><a href="../databases_code.html">Back to source list</a></p><pre><code># Cell 1
+# Python Testing Script
+Use this template to create a Python testing script that imports your CRUD Python module to call and test the create and read instances of CRUD functionality. 
+### 1. Import your CRUD Python module
+### 2. Instantiate an instance of your class
+### 3. Use your create function create a new record in the aac database
+### 4. Use your read funtion to return records from the aac database 
+### 5. Use your update function to update an existing record in the aac database
+### 6. Use your delete function to delete an existing record in the aac database
+
+&lt;div class=&quot;alert alert-block alert-success&quot;&gt;&lt;span style=&quot;color:black;&quot;&gt;&lt;b&gt;Tip: &lt;/b&gt;You should have created test functionality for items 1 thru 4 during Module Four Milestone, copy over your existing test script code and expand it here to call and test the Update and Delete functionality.&lt;/span&gt;&lt;/div&gt;
+
+# Cell 2
+# CS 340 Project One Test Script
+# Student: Trevor Powers
+
+import importlib
+import CRUD_Python_Module
+
+# Reload the module to use the latest saved version
+importlib.reload(CRUD_Python_Module)
+
+from CRUD_Python_Module import AnimalShelter
+
+# Connect using the MongoDB user created for the AAC database
+shelter = AnimalShelter(&#x27;REPLACE_WITH_LOCAL_CREDENTIAL&#x27;, &#x27;REPLACE_WITH_LOCAL_CREDENTIAL&#x27;)
+
+print(&quot;CRUD module imported successfully.&quot;)
+print(&quot;AnimalShelter object created successfully.&quot;)
+
+# Remove any leftover test records from previous runs
+shelter.delete({&quot;animal_id&quot;: &quot;PROJECT_ONE_TREVOR_TEST&quot;})
+
+# Test Create
+test_document = {
+    &quot;animal_id&quot;: &quot;PROJECT_ONE_TREVOR_TEST&quot;,
+    &quot;name&quot;: &quot;Trevor Test Animal&quot;,
+    &quot;animal_type&quot;: &quot;Dog&quot;,
+    &quot;breed&quot;: &quot;Labrador Retriever Mix&quot;,
+    &quot;color&quot;: &quot;Black&quot;,
+    &quot;age_upon_outcome&quot;: &quot;2 years&quot;,
+    &quot;outcome_type&quot;: &quot;Adoption&quot;
+}
+
+create_result = shelter.create(test_document)
+print(&quot;\nCREATE result:&quot;, create_result)
+
+# Test Read
+query = {&quot;animal_id&quot;: &quot;PROJECT_ONE_TREVOR_TEST&quot;}
+read_result = shelter.read(query)
+
+print(&quot;\nREAD returned a:&quot;, type(read_result))
+print(&quot;Records found:&quot;, len(read_result))
+print(&quot;Record before update:&quot;, read_result)
+
+# Test Update
+update_result = shelter.update(
+    query,
+    {
+        &quot;name&quot;: &quot;Trevor Updated Animal&quot;,
+        &quot;outcome_type&quot;: &quot;Transfer&quot;
+    }
+)
+
+print(&quot;\nUPDATE records modified:&quot;, update_result)
+
+updated_records = shelter.read(query)
+print(&quot;Record after update:&quot;, updated_records)
+
+# Test Delete
+delete_result = shelter.delete(query)
+print(&quot;\nDELETE records removed:&quot;, delete_result)
+
+remaining_records = shelter.read(query)
+print(&quot;Records remaining after delete:&quot;, len(remaining_records))
+
+# Cell 3
+</code></pre></section></main><footer>Trevor Powers · Southern New Hampshire University · 2026</footer></body></html>

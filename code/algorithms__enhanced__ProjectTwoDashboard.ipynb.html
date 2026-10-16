@@ -1,0 +1,226 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>algorithms/enhanced/ProjectTwoDashboard.ipynb | Trevor Powers</title><meta name="description" content="Trevor Powers CS 499 computer science portfolio with original and enhanced code, narratives, and code review."><link rel="stylesheet" href="../style.css"></head><body><a class="skip" href="#main">Skip to content</a><header class="hero"><div class="container"><p class="eyebrow">CS 499 Computer Science Capstone</p><h1>Trevor Powers</h1><h2>algorithms/enhanced/ProjectTwoDashboard.ipynb</h2><nav aria-label="Main navigation"><a href="../index.html">Portfolio home</a><a href="../index.html#artifacts">Artifacts</a><a href="../setup.html">Setup and testing</a></nav></div></header><main id="main" class="container"><section class="card"><h2>algorithms/enhanced/ProjectTwoDashboard.ipynb</h2><p><a href="../algorithms_code.html">Back to source list</a></p><pre><code># Cell 1
+# Set up the Jupyter version of Dash
+from jupyter_dash import JupyterDash
+
+# Import dashboard components
+import dash_leaflet as dl
+from dash import dcc, html, dash_table
+from dash.dependencies import Input, Output
+import plotly.express as px
+import pandas as pd
+import base64
+
+# Import your existing CRUD module
+from CRUD_Python_Module import AnimalShelter
+from animal_index import AnimalIndex
+
+JupyterDash.infer_jupyter_proxy_config()
+
+# Connect to MongoDB through the CRUD module
+username = &#x27;REPLACE_WITH_LOCAL_CREDENTIAL&#x27;
+password = &#x27;REPLACE_WITH_LOCAL_CREDENTIAL&#x27;
+db = AnimalShelter(username, password)
+
+# Get the unfiltered animal records
+index = AnimalIndex(db.read({}))
+df = pd.DataFrame.from_records(index.records)
+
+# MongoDB&#x27;s _id field cannot be displayed in the Dash table
+if &quot;_id&quot; in df.columns:
+    df.drop(columns=[&quot;_id&quot;], inplace=True)
+
+# Load Grazioso Salvare logo
+image_filename = &quot;Grazioso Salvare Logo.png&quot;
+encoded_image = base64.b64encode(open(image_filename, &quot;rb&quot;).read()).decode()
+
+# Create dashboard
+app = JupyterDash(__name__)
+
+app.layout = html.Div([
+    html.Center([
+        html.Img(
+            src=&quot;data:image/png;base64,{}&quot;.format(encoded_image),
+            style={&quot;width&quot;: &quot;220px&quot;}
+        ),
+        html.H1(&quot;Grazioso Salvare Animal Shelter Dashboard&quot;),
+        html.H3(&quot;Trevor Powers | CS 340&quot;)
+    ]),
+
+    html.Hr(),
+
+    html.Div([
+        html.H4(&quot;Select a Rescue Type:&quot;),
+        dcc.RadioItems(
+            id=&quot;filter-type&quot;,
+            options=[
+                {&quot;label&quot;: &quot;Reset / All Animals&quot;, &quot;value&quot;: &quot;RESET&quot;},
+                {&quot;label&quot;: &quot;Water Rescue&quot;, &quot;value&quot;: &quot;WATER&quot;},
+                {&quot;label&quot;: &quot;Mountain or Wilderness Rescue&quot;, &quot;value&quot;: &quot;MOUNTAIN&quot;},
+                {&quot;label&quot;: &quot;Disaster or Individual Tracking&quot;, &quot;value&quot;: &quot;DISASTER&quot;}
+            ],
+            value=&quot;RESET&quot;,
+            labelStyle={&quot;display&quot;: &quot;block&quot;, &quot;margin&quot;: &quot;8px&quot;}
+        )
+    ]),
+
+    html.Div([
+        dcc.Input(id=&quot;animal-search&quot;, type=&quot;text&quot;, placeholder=&quot;Exact animal ID&quot;),
+        dcc.Input(id=&quot;breed-search&quot;, type=&quot;text&quot;, placeholder=&quot;Exact breed&quot;),
+        dcc.Dropdown(id=&quot;sort-field&quot;, options=[
+            {&quot;label&quot;: label, &quot;value&quot;: field} for label, field in [
+                (&quot;Animal ID&quot;, &quot;animal_id&quot;), (&quot;Name&quot;, &quot;name&quot;),
+                (&quot;Breed&quot;, &quot;breed&quot;), (&quot;Age in weeks&quot;, &quot;age_upon_outcome_in_weeks&quot;)
+            ]], value=&quot;animal_id&quot;, clearable=False),
+        dcc.Checklist(id=&quot;sort-direction&quot;, options=[{&quot;label&quot;: &quot;Descending&quot;, &quot;value&quot;: &quot;desc&quot;}], value=[])
+    ]),
+
+    html.Hr(),
+
+    dash_table.DataTable(
+        id=&quot;datatable-id&quot;,
+        columns=[
+            {&quot;name&quot;: column, &quot;id&quot;: column, &quot;deletable&quot;: False, &quot;selectable&quot;: True}
+            for column in df.columns
+        ],
+        data=df.to_dict(&quot;records&quot;),
+        page_size=10,
+        sort_action=&quot;none&quot;,
+        filter_action=&quot;native&quot;,
+        row_selectable=&quot;single&quot;,
+        selected_rows=[0],
+        style_table={&quot;overflowX&quot;: &quot;auto&quot;},
+        style_cell={
+            &quot;textAlign&quot;: &quot;left&quot;,
+            &quot;minWidth&quot;: &quot;110px&quot;,
+            &quot;width&quot;: &quot;110px&quot;,
+            &quot;maxWidth&quot;: &quot;180px&quot;,
+            &quot;whiteSpace&quot;: &quot;normal&quot;
+        },
+        style_header={
+            &quot;backgroundColor&quot;: &quot;#1f5f3a&quot;,
+            &quot;color&quot;: &quot;white&quot;,
+            &quot;fontWeight&quot;: &quot;bold&quot;
+        }
+    ),
+
+    html.Br(),
+    html.Hr(),
+
+    html.Div(
+        style={&quot;display&quot;: &quot;flex&quot;},
+        children=[
+            html.Div(id=&quot;graph-id&quot;, style={&quot;width&quot;: &quot;50%&quot;}),
+            html.Div(id=&quot;map-id&quot;, style={&quot;width&quot;: &quot;50%&quot;})
+        ]
+    )
+])
+
+
+# Index is built once. These controls reuse the same snapshot without a database round trip.
+@app.callback(
+    Output(&quot;datatable-id&quot;, &quot;data&quot;),
+    Input(&quot;filter-type&quot;, &quot;value&quot;), Input(&quot;animal-search&quot;, &quot;value&quot;),
+    Input(&quot;breed-search&quot;, &quot;value&quot;), Input(&quot;sort-field&quot;, &quot;value&quot;),
+    Input(&quot;sort-direction&quot;, &quot;value&quot;)
+)
+def update_dashboard(filter_type, animal_id, breed, sort_by, direction):
+    return index.search(filter_type or &quot;RESET&quot;, animal_id or &quot;&quot;, breed or &quot;&quot;,
+                        sort_by or &quot;animal_id&quot;, &quot;desc&quot; in (direction or []))
+
+
+# Create a dynamic breed chart from the table data
+@app.callback(
+    Output(&quot;graph-id&quot;, &quot;children&quot;),
+    Input(&quot;datatable-id&quot;, &quot;derived_virtual_data&quot;)
+)
+def update_graphs(view_data):
+
+    if not view_data:
+        return html.P(&quot;No animal records match this filter.&quot;)
+
+    chart_df = pd.DataFrame(view_data)
+    breed_counts = chart_df[&quot;breed&quot;].value_counts().head(10).reset_index()
+    breed_counts.columns = [&quot;Breed&quot;, &quot;Count&quot;]
+
+    figure = px.bar(
+        breed_counts,
+        x=&quot;Breed&quot;,
+        y=&quot;Count&quot;,
+        title=&quot;Top Breeds in Current Results&quot;,
+        color=&quot;Count&quot;,
+        color_continuous_scale=&quot;Greens&quot;
+    )
+
+    figure.update_layout(xaxis_tickangle=-45)
+
+    return dcc.Graph(figure=figure)
+
+
+# Highlight selected table column
+@app.callback(
+    Output(&quot;datatable-id&quot;, &quot;style_data_conditional&quot;),
+    Input(&quot;datatable-id&quot;, &quot;selected_columns&quot;)
+)
+def update_styles(selected_columns):
+    return [
+        {
+            &quot;if&quot;: {&quot;column_id&quot;: column},
+            &quot;background_color&quot;: &quot;#D2F3FF&quot;
+        }
+        for column in selected_columns
+    ]
+
+
+# Update the map based on the selected table row
+@app.callback(
+    Output(&quot;map-id&quot;, &quot;children&quot;),
+    [
+        Input(&quot;datatable-id&quot;, &quot;derived_virtual_data&quot;),
+        Input(&quot;datatable-id&quot;, &quot;derived_virtual_selected_rows&quot;)
+    ]
+)
+def update_map(view_data, selected_rows):
+
+    if not view_data:
+        return html.P(&quot;No map data is available for this filter.&quot;)
+
+    map_df = pd.DataFrame(view_data)
+
+    row = 0
+    if selected_rows and len(selected_rows) &gt; 0:
+        row = selected_rows[0]
+
+    if row &gt;= len(map_df):
+        row = 0
+
+    latitude = map_df.iloc[row][&quot;location_lat&quot;]
+    longitude = map_df.iloc[row][&quot;location_long&quot;]
+    breed = map_df.iloc[row][&quot;breed&quot;]
+    animal_name = map_df.iloc[row][&quot;name&quot;]
+
+    return [
+        dl.Map(
+            style={&quot;width&quot;: &quot;100%&quot;, &quot;height&quot;: &quot;500px&quot;},
+            center=[latitude, longitude],
+            zoom=10,
+            children=[
+                dl.TileLayer(),
+                dl.Marker(
+                    position=[latitude, longitude],
+                    children=[
+                        dl.Tooltip(breed),
+                        dl.Popup([
+                            html.H4(&quot;Animal Information&quot;),
+                            html.P(&quot;Name: &quot; + str(animal_name)),
+                            html.P(&quot;Breed: &quot; + str(breed))
+                        ])
+                    ]
+                )
+            ]
+        )
+    ]
+
+app.run_server(mode=&quot;external&quot;)
+
+# Cell 2
+</code></pre></section></main><footer>Trevor Powers · Southern New Hampshire University · 2026</footer></body></html>

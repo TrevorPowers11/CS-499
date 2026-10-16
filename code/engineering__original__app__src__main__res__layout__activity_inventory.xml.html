@@ -1,0 +1,108 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>engineering/original/app/src/main/res/layout/activity_inventory.xml | Trevor Powers</title><meta name="description" content="Trevor Powers CS 499 computer science portfolio with original and enhanced code, narratives, and code review."><link rel="stylesheet" href="../style.css"></head><body><a class="skip" href="#main">Skip to content</a><header class="hero"><div class="container"><p class="eyebrow">CS 499 Computer Science Capstone</p><h1>Trevor Powers</h1><h2>engineering/original/app/src/main/res/layout/activity_inventory.xml</h2><nav aria-label="Main navigation"><a href="../index.html">Portfolio home</a><a href="../index.html#artifacts">Artifacts</a><a href="../setup.html">Setup and testing</a></nav></div></header><main id="main" class="container"><section class="card"><h2>engineering/original/app/src/main/res/layout/activity_inventory.xml</h2><p><a href="../engineering_code.html">Back to source list</a></p><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
+&lt;LinearLayout xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;
+    android:layout_width=&quot;match_parent&quot;
+    android:layout_height=&quot;match_parent&quot;
+    android:orientation=&quot;vertical&quot;
+    android:padding=&quot;24dp&quot;
+    android:background=&quot;#F4F6F8&quot;&gt;
+
+    &lt;TextView
+        android:layout_width=&quot;match_parent&quot;
+        android:layout_height=&quot;wrap_content&quot;
+        android:text=&quot;Inventory Manager&quot;
+        android:textSize=&quot;28sp&quot;
+        android:textStyle=&quot;bold&quot;
+        android:textColor=&quot;#1F2937&quot;
+        android:gravity=&quot;center&quot;
+        android:layout_marginBottom=&quot;20dp&quot; /&gt;
+
+    &lt;EditText
+        android:id=&quot;@+id/itemNameEditText&quot;
+        android:layout_width=&quot;match_parent&quot;
+        android:layout_height=&quot;wrap_content&quot;
+        android:hint=&quot;Item name&quot;
+        android:inputType=&quot;textCapWords&quot;
+        android:padding=&quot;12dp&quot; /&gt;
+
+    &lt;EditText
+        android:id=&quot;@+id/itemQuantityEditText&quot;
+        android:layout_width=&quot;match_parent&quot;
+        android:layout_height=&quot;wrap_content&quot;
+        android:hint=&quot;Quantity&quot;
+        android:inputType=&quot;number&quot;
+        android:padding=&quot;12dp&quot;
+        android:layout_marginTop=&quot;8dp&quot; /&gt;
+
+    &lt;Button
+        android:id=&quot;@+id/addItemButton&quot;
+        android:layout_width=&quot;match_parent&quot;
+        android:layout_height=&quot;wrap_content&quot;
+        android:text=&quot;Add Item&quot;
+        android:layout_marginTop=&quot;12dp&quot; /&gt;
+
+    &lt;TextView
+        android:layout_width=&quot;match_parent&quot;
+        android:layout_height=&quot;wrap_content&quot;
+        android:text=&quot;Current Inventory&quot;
+        android:textSize=&quot;20sp&quot;
+        android:textStyle=&quot;bold&quot;
+        android:textColor=&quot;#1F2937&quot;
+        android:layout_marginTop=&quot;24dp&quot;
+        android:layout_marginBottom=&quot;8dp&quot; /&gt;
+
+    &lt;LinearLayout
+        android:layout_width=&quot;match_parent&quot;
+        android:layout_height=&quot;wrap_content&quot;
+        android:orientation=&quot;horizontal&quot;
+        android:padding=&quot;8dp&quot;
+        android:background=&quot;#DDE3EA&quot;&gt;
+
+        &lt;TextView
+            android:layout_width=&quot;0dp&quot;
+            android:layout_height=&quot;wrap_content&quot;
+            android:layout_weight=&quot;2&quot;
+            android:text=&quot;Item&quot;
+            android:textStyle=&quot;bold&quot; /&gt;
+
+        &lt;TextView
+            android:layout_width=&quot;0dp&quot;
+            android:layout_height=&quot;wrap_content&quot;
+            android:layout_weight=&quot;1&quot;
+            android:text=&quot;Quantity&quot;
+            android:textStyle=&quot;bold&quot;
+            android:gravity=&quot;center&quot; /&gt;
+
+        &lt;TextView
+            android:layout_width=&quot;0dp&quot;
+            android:layout_height=&quot;wrap_content&quot;
+            android:layout_weight=&quot;2&quot;
+            android:text=&quot;Actions&quot;
+            android:textStyle=&quot;bold&quot;
+            android:gravity=&quot;center&quot; /&gt;
+    &lt;/LinearLayout&gt;
+
+    &lt;LinearLayout
+        android:id=&quot;@+id/inventoryContainer&quot;
+        android:layout_width=&quot;match_parent&quot;
+        android:layout_height=&quot;0dp&quot;
+        android:layout_weight=&quot;1&quot;
+        android:orientation=&quot;vertical&quot;
+        android:background=&quot;#FFFFFF&quot; /&gt;
+
+    &lt;EditText
+        android:id=&quot;@+id/phoneNumberEditText&quot;
+        android:layout_width=&quot;match_parent&quot;
+        android:layout_height=&quot;wrap_content&quot;
+        android:hint=&quot;Phone number for low-stock alerts (optional)&quot;
+        android:inputType=&quot;phone&quot;
+        android:padding=&quot;12dp&quot;
+        android:layout_marginTop=&quot;16dp&quot; /&gt;
+
+    &lt;Button
+        android:id=&quot;@+id/smsPermissionButton&quot;
+        android:layout_width=&quot;match_parent&quot;
+        android:layout_height=&quot;wrap_content&quot;
+        android:text=&quot;Enable SMS Notifications&quot;
+        android:layout_marginTop=&quot;8dp&quot; /&gt;
+
+&lt;/LinearLayout&gt;</code></pre></section></main><footer>Trevor Powers · Southern New Hampshire University · 2026</footer></body></html>

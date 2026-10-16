@@ -1,0 +1,67 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>databases/enhanced/tests/test_database.py | Trevor Powers</title><meta name="description" content="Trevor Powers CS 499 computer science portfolio with original and enhanced code, narratives, and code review."><link rel="stylesheet" href="../style.css"></head><body><a class="skip" href="#main">Skip to content</a><header class="hero"><div class="container"><p class="eyebrow">CS 499 Computer Science Capstone</p><h1>Trevor Powers</h1><h2>databases/enhanced/tests/test_database.py</h2><nav aria-label="Main navigation"><a href="../index.html">Portfolio home</a><a href="../index.html#artifacts">Artifacts</a><a href="../setup.html">Setup and testing</a></nav></div></header><main id="main" class="container"><section class="card"><h2>databases/enhanced/tests/test_database.py</h2><p><a href="../databases_code.html">Back to source list</a></p><pre><code>import unittest
+from unittest.mock import patch
+import mongomock
+from pymongo.errors import OperationFailure
+from CRUD_Python_Module import AnimalShelter, DatabaseError, controlled_query
+from dashboard import create_app
+
+class DatabaseTests(unittest.TestCase):
+    def setUp(self):
+        self.collection = mongomock.MongoClient().aac.animals
+        self.db = AnimalShelter(collection=self.collection)
+        self.collection.insert_many([{&#x27;animal_id&#x27;: f&#x27;A{i:03}&#x27;, &#x27;animal_type&#x27;: &#x27;Dog&#x27;,
+            &#x27;breed&#x27;: &#x27;Labrador Retriever Mix&#x27;, &#x27;sex_upon_outcome&#x27;: &#x27;Intact Female&#x27;,
+            &#x27;age_upon_outcome_in_weeks&#x27;: 26+i, &#x27;name&#x27;: f&#x27;Animal {i}&#x27;,
+            &#x27;location_lat&#x27;: 30.2, &#x27;location_long&#x27;: -97.7} for i in range(25)])
+
+    def test_disjoint_pages_and_projection(self):
+        a = self.db.read_page()[&#x27;records&#x27;]; b = self.db.read_page(page=1)[&#x27;records&#x27;]
+        self.assertEqual(len(a), 10)
+        self.assertFalse({x[&#x27;animal_id&#x27;] for x in a} &amp; {x[&#x27;animal_id&#x27;] for x in b})
+        self.assertNotIn(&#x27;_id&#x27;, a[0])
+        self.assertEqual(self.db.read_page(page=2)[&#x27;total&#x27;], 25)
+        self.assertEqual(len(self.db.read_page(page=999)[&#x27;records&#x27;]), 5)
+
+    def test_rescue_boundaries_and_intersection(self):
+        self.collection.insert_one({&#x27;animal_id&#x27;:&#x27;OUT&#x27;,&#x27;animal_type&#x27;:&#x27;Dog&#x27;,&#x27;breed&#x27;:&#x27;Labrador Retriever Mix&#x27;,
+            &#x27;sex_upon_outcome&#x27;:&#x27;Intact Female&#x27;,&#x27;age_upon_outcome_in_weeks&#x27;:157})
+        self.assertEqual(self.db.read_page(&#x27;WATER&#x27;)[&#x27;total&#x27;],25)
+        self.assertEqual(self.db.read_page(&#x27;WATER&#x27;, {&#x27;breed&#x27;:&#x27;Bloodhound&#x27;})[&#x27;total&#x27;],0)
+        self.assertEqual(self.db.read_page(&#x27;MOUNTAIN&#x27;)[&#x27;total&#x27;],0)
+        self.assertIn(&#x27;$gte&#x27;,controlled_query(&#x27;DISASTER&#x27;)[&#x27;age_upon_outcome_in_weeks&#x27;])
+
+    def test_summary_covers_all_pages(self):
+        self.assertEqual(self.db.summary()[0][&#x27;count&#x27;],25)
+
+    def test_injection_and_invalid_inputs(self):
+        for filters in [{&#x27;breed&#x27;:{&#x27;$ne&#x27;:None}}, {&#x27;$where&#x27;:&#x27;malicious&#x27;}, {&#x27;age_upon_outcome_in_weeks&#x27;:float(&#x27;nan&#x27;)}]:
+            with self.assertRaises(ValueError): self.db.read_page(filters=filters)
+        for args in [{&#x27;page_size&#x27;:0},{&#x27;page&#x27;:-1},{&#x27;sort_field&#x27;:&#x27;$where&#x27;},{&#x27;direction&#x27;:True}]:
+            with self.assertRaises(ValueError): self.db.read_page(**args)
+        with self.assertRaises(ValueError): self.db.summary(group_by=&#x27;$where&#x27;)
+
+    def test_crud_and_write_guards(self):
+        self.assertTrue(self.db.create({&#x27;animal_id&#x27;:&#x27;NEW&#x27;,&#x27;animal_type&#x27;:&#x27;Cat&#x27;,&#x27;breed&#x27;:&#x27;Domestic Shorthair&#x27;}))
+        self.assertEqual(self.db.update({&#x27;animal_id&#x27;:&#x27;NEW&#x27;},{&#x27;name&#x27;:&#x27;Milo&#x27;}),1)
+        self.assertEqual(self.db.delete({&#x27;animal_id&#x27;:&#x27;NEW&#x27;}),1)
+        with self.assertRaises(ValueError): self.db.delete({})
+        with self.assertRaises(ValueError): self.db.update({&#x27;breed&#x27;:&#x27;Dog&#x27;},{&#x27;name&#x27;:&#x27;Bad&#x27;})
+        with self.assertRaises(ValueError): self.db.create({&#x27;animal_id&#x27;:&#x27;bad&#x27;})
+
+    def test_indexes_are_idempotent(self):
+        self.db.ensure_indexes(); self.db.ensure_indexes()
+        self.assertIn(&#x27;rescue_filter&#x27;,self.collection.index_information())
+
+    def test_safe_error_and_empty_distinction(self):
+        self.assertEqual(self.db.read_page(filters={&#x27;animal_id&#x27;:&#x27;missing&#x27;})[&#x27;total&#x27;],0)
+        with patch.object(self.collection,&#x27;count_documents&#x27;,side_effect=OperationFailure(&#x27;secret-uri&#x27;)):
+            with self.assertRaises(DatabaseError) as caught: self.db.read_page()
+        self.assertNotIn(&#x27;secret-uri&#x27;,str(caught.exception))
+
+    def test_dashboard_layout_served(self):
+        client=create_app(self.db).server.test_client()
+        self.assertEqual(client.get(&#x27;/&#x27;).status_code,200)
+        self.assertEqual(client.get(&#x27;/_dash-layout&#x27;).status_code,200)
+
+if __name__ == &#x27;__main__&#x27;: unittest.main()
+</code></pre></section></main><footer>Trevor Powers · Southern New Hampshire University · 2026</footer></body></html>

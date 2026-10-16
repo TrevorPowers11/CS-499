@@ -1,0 +1,153 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>databases/enhanced/CRUD_Python_Module.py | Trevor Powers</title><meta name="description" content="Trevor Powers CS 499 computer science portfolio with original and enhanced code, narratives, and code review."><link rel="stylesheet" href="../style.css"></head><body><a class="skip" href="#main">Skip to content</a><header class="hero"><div class="container"><p class="eyebrow">CS 499 Computer Science Capstone</p><h1>Trevor Powers</h1><h2>databases/enhanced/CRUD_Python_Module.py</h2><nav aria-label="Main navigation"><a href="../index.html">Portfolio home</a><a href="../index.html#artifacts">Artifacts</a><a href="../setup.html">Setup and testing</a></nav></div></header><main id="main" class="container"><section class="card"><h2>databases/enhanced/CRUD_Python_Module.py</h2><p><a href="../databases_code.html">Back to source list</a></p><pre><code>&quot;&quot;&quot;Controlled MongoDB access for the CS 499 database enhancement.&quot;&quot;&quot;
+import logging
+import math
+import os
+from pymongo import MongoClient, ASCENDING
+from pymongo.errors import PyMongoError
+
+LOG = logging.getLogger(__name__)
+FIELDS = {&#x27;animal_id&#x27;, &#x27;animal_type&#x27;, &#x27;breed&#x27;, &#x27;name&#x27;, &#x27;sex_upon_outcome&#x27;,
+          &#x27;age_upon_outcome_in_weeks&#x27;, &#x27;location_lat&#x27;, &#x27;location_long&#x27;, &#x27;outcome_type&#x27;}
+SORT_FIELDS = {&#x27;animal_id&#x27;, &#x27;name&#x27;, &#x27;breed&#x27;, &#x27;age_upon_outcome_in_weeks&#x27;}
+RULES = {
+    &#x27;WATER&#x27;: ([&#x27;Labrador Retriever Mix&#x27;, &#x27;Chesapeake Bay Retriever&#x27;, &#x27;Newfoundland&#x27;], &#x27;Intact Female&#x27;, 26, 156),
+    &#x27;MOUNTAIN&#x27;: ([&#x27;German Shepherd&#x27;, &#x27;Alaskan Malamute&#x27;, &#x27;Old English Sheepdog&#x27;, &#x27;Siberian Husky&#x27;, &#x27;Rottweiler&#x27;], &#x27;Intact Male&#x27;, 26, 156),
+    &#x27;DISASTER&#x27;: ([&#x27;Doberman Pinscher&#x27;, &#x27;German Shepherd&#x27;, &#x27;Golden Retriever&#x27;, &#x27;Bloodhound&#x27;, &#x27;Rottweiler&#x27;], &#x27;Intact Male&#x27;, 20, 300),
+}
+
+class DatabaseError(RuntimeError):
+    &quot;&quot;&quot;Safe error for the application; driver details never reach the UI.&quot;&quot;&quot;
+
+
+def controlled_query(rescue=&#x27;RESET&#x27;, filters=None):
+    if rescue not in {&#x27;RESET&#x27;, *RULES}:
+        raise ValueError(&#x27;Unknown rescue category.&#x27;)
+    if filters is None:
+        filters = {}
+    if not isinstance(filters, dict) or set(filters) - FIELDS:
+        raise ValueError(&#x27;Unsupported filter field.&#x27;)
+    for field, value in filters.items():
+        validate_value(field, value)
+    query = dict(filters)
+    if rescue != &#x27;RESET&#x27;:
+        breeds, sex, low, high = RULES[rescue]
+        rule = {&#x27;animal_type&#x27;: &#x27;Dog&#x27;, &#x27;breed&#x27;: {&#x27;$in&#x27;: breeds},
+                &#x27;sex_upon_outcome&#x27;: sex,
+                &#x27;age_upon_outcome_in_weeks&#x27;: {&#x27;$gte&#x27;: low, &#x27;$lte&#x27;: high}}
+        query = {&#x27;$and&#x27;: [rule, query]} if query else rule
+    return query
+
+
+def validate_value(field, value):
+    if field in {&#x27;age_upon_outcome_in_weeks&#x27;, &#x27;location_lat&#x27;, &#x27;location_long&#x27;}:
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            raise ValueError(&#x27;Numeric values must be finite numbers.&#x27;)
+        if field == &#x27;age_upon_outcome_in_weeks&#x27; and value &lt; 0:
+            raise ValueError(&#x27;Age cannot be negative.&#x27;)
+        if field == &#x27;location_lat&#x27; and not -90 &lt;= value &lt;= 90:
+            raise ValueError(&#x27;Invalid latitude.&#x27;)
+        if field == &#x27;location_long&#x27; and not -180 &lt;= value &lt;= 180:
+            raise ValueError(&#x27;Invalid longitude.&#x27;)
+    elif not isinstance(value, str) or not value.strip() or len(value) &gt; 200:
+        raise ValueError(&#x27;Text values must contain 1 to 200 characters.&#x27;)
+
+
+def guard(operation):
+    &quot;&quot;&quot;Translate driver failures without leaking credentials or server details.&quot;&quot;&quot;
+    def wrapped(*args, **kwargs):
+        try:
+            return operation(*args, **kwargs)
+        except PyMongoError as error:
+            LOG.error(&#x27;Database operation %s failed (%s)&#x27;, operation.__name__, type(error).__name__)
+            raise DatabaseError(&#x27;Database operation failed. Check configuration and try again.&#x27;) from None
+    return wrapped
+
+
+class AnimalShelter:
+    def __init__(self, *, collection=None):
+        self.client = None
+        if collection is not None:  # Dependency injection for isolated tests.
+            self.collection = collection
+            return
+        uri = os.environ.get(&#x27;MONGODB_URI&#x27;)
+        if not uri:
+            raise ValueError(&#x27;Set MONGODB_URI before starting the application.&#x27;)
+        try:
+            self.client = MongoClient(uri, serverSelectionTimeoutMS=5000, connectTimeoutMS=5000)
+            self.client.admin.command(&#x27;ping&#x27;)
+            self.collection = self.client[os.getenv(&#x27;MONGODB_DATABASE&#x27;, &#x27;aac&#x27;)][os.getenv(&#x27;MONGODB_COLLECTION&#x27;, &#x27;animals&#x27;)]
+        except PyMongoError as error:
+            if self.client is not None:
+                self.client.close()
+            LOG.error(&#x27;Database connection failed (%s)&#x27;, type(error).__name__)
+            raise DatabaseError(&#x27;Unable to connect to the database. Check configuration.&#x27;) from None
+
+    @guard
+    def ensure_indexes(self):
+        return [self.collection.create_index([
+                    (&#x27;animal_type&#x27;, ASCENDING), (&#x27;sex_upon_outcome&#x27;, ASCENDING),
+                    (&#x27;breed&#x27;, ASCENDING), (&#x27;age_upon_outcome_in_weeks&#x27;, ASCENDING)], name=&#x27;rescue_filter&#x27;),
+                self.collection.create_index(&#x27;animal_id&#x27;, name=&#x27;animal_id_lookup&#x27;)]
+
+    @guard
+    def read_page(self, rescue=&#x27;RESET&#x27;, filters=None, *, page=0, page_size=10, sort_field=&#x27;animal_id&#x27;, direction=1):
+        if type(page) is not int or page &lt; 0 or page &gt; 100000:
+            raise ValueError(&#x27;Page must be an integer from 0 to 100000.&#x27;)
+        if type(page_size) is not int or not 1 &lt;= page_size &lt;= 100:
+            raise ValueError(&#x27;Page size must be from 1 to 100.&#x27;)
+        if sort_field not in SORT_FIELDS or type(direction) is not int or direction not in (-1, 1):
+            raise ValueError(&#x27;Unsupported sort request.&#x27;)
+        query = controlled_query(rescue, filters)
+        total = self.collection.count_documents(query)
+        effective_page = min(page, max(0, (total - 1) // page_size))
+        # _id is the tie-breaker even if animal_id is duplicated in outcome records.
+        cursor = self.collection.find(query, {&#x27;_id&#x27;: 0, **{f: 1 for f in FIELDS}}).sort(
+            [(sort_field, direction), (&#x27;_id&#x27;, direction)]).skip(effective_page * page_size).limit(page_size)
+        return {&#x27;records&#x27;: list(cursor), &#x27;total&#x27;: total, &#x27;page&#x27;: effective_page,
+                &#x27;page_count&#x27;: (total + page_size - 1) // page_size}
+
+    @guard
+    def summary(self, rescue=&#x27;RESET&#x27;, filters=None, *, group_by=&#x27;breed&#x27;):
+        if group_by not in {&#x27;breed&#x27;, &#x27;animal_type&#x27;, &#x27;outcome_type&#x27;}:
+            raise ValueError(&#x27;Unsupported summary field.&#x27;)
+        pipeline = [{&#x27;$match&#x27;: controlled_query(rescue, filters)},
+                    {&#x27;$group&#x27;: {&#x27;_id&#x27;: &#x27;$&#x27; + group_by, &#x27;count&#x27;: {&#x27;$sum&#x27;: 1}}},
+                    {&#x27;$sort&#x27;: {&#x27;count&#x27;: -1, &#x27;_id&#x27;: 1}}, {&#x27;$limit&#x27;: 10},
+                    {&#x27;$project&#x27;: {&#x27;_id&#x27;: 0, &#x27;category&#x27;: &#x27;$_id&#x27;, &#x27;count&#x27;: 1}}]
+        return list(self.collection.aggregate(pipeline))
+
+    def _document(self, data, *, creating=False):
+        if not isinstance(data, dict) or not data or set(data) - FIELDS:
+            raise ValueError(&#x27;Use supported animal fields only.&#x27;)
+        if creating and not {&#x27;animal_id&#x27;, &#x27;animal_type&#x27;, &#x27;breed&#x27;} &lt;= set(data):
+            raise ValueError(&#x27;Animal ID, type and breed are required.&#x27;)
+        for field, value in data.items():
+            validate_value(field, value)
+        return dict(data)
+
+    @guard
+    def create(self, data):
+        return self.collection.insert_one(self._document(data, creating=True)).acknowledged
+
+    def _write_query(self, filters):
+        query = controlled_query(filters=filters)
+        if not query or &#x27;animal_id&#x27; not in query:
+            raise ValueError(&#x27;Writes require an animal_id filter.&#x27;)
+        return query
+
+    @guard
+    def update(self, filters, new_data):
+        query = self._write_query(filters)
+        data = self._document(new_data)
+        if &#x27;animal_id&#x27; in data:
+            raise ValueError(&#x27;Animal ID cannot be changed.&#x27;)
+        return self.collection.update_many(query, {&#x27;$set&#x27;: data}).modified_count
+
+    @guard
+    def delete(self, filters):
+        return self.collection.delete_many(self._write_query(filters)).deleted_count
+
+    def close(self):
+        if self.client is not None:
+            self.client.close()
+</code></pre></section></main><footer>Trevor Powers · Southern New Hampshire University · 2026</footer></body></html>

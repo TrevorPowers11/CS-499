@@ -1,0 +1,72 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>databases/enhanced/dashboard.py | Trevor Powers</title><meta name="description" content="Trevor Powers CS 499 computer science portfolio with original and enhanced code, narratives, and code review."><link rel="stylesheet" href="../style.css"></head><body><a class="skip" href="#main">Skip to content</a><header class="hero"><div class="container"><p class="eyebrow">CS 499 Computer Science Capstone</p><h1>Trevor Powers</h1><h2>databases/enhanced/dashboard.py</h2><nav aria-label="Main navigation"><a href="../index.html">Portfolio home</a><a href="../index.html#artifacts">Artifacts</a><a href="../setup.html">Setup and testing</a></nav></div></header><main id="main" class="container"><section class="card"><h2>databases/enhanced/dashboard.py</h2><p><a href="../databases_code.html">Back to source list</a></p><pre><code>&quot;&quot;&quot;Database-paginated dashboard. Run: python dashboard.py&quot;&quot;&quot;
+import atexit
+import base64
+import math
+from pathlib import Path
+from dash import Dash, Input, Output, ctx, dcc, html, dash_table
+import dash_leaflet as dl
+import plotly.graph_objects as go
+from CRUD_Python_Module import AnimalShelter, DatabaseError, FIELDS
+
+
+def create_app(db):
+    app = Dash(__name__)
+    logo = base64.b64encode(Path(__file__).with_name(&#x27;logo.png&#x27;).read_bytes()).decode()
+    app.layout = html.Div([
+        html.Img(src=&#x27;data:image/png;base64,&#x27; + logo, style={&#x27;width&#x27;: &#x27;220px&#x27;}),
+        html.H1(&#x27;Grazioso Salvare Animal Shelter Dashboard&#x27;),
+        html.P(&#x27;Trevor Powers | CS 499 Database Enhancement&#x27;),
+        dcc.RadioItems(id=&#x27;rescue&#x27;, options=[{&#x27;label&#x27;: label, &#x27;value&#x27;: value} for label, value in [
+            (&#x27;All animals&#x27;, &#x27;RESET&#x27;), (&#x27;Water rescue&#x27;, &#x27;WATER&#x27;),
+            (&#x27;Mountain or wilderness rescue&#x27;, &#x27;MOUNTAIN&#x27;), (&#x27;Disaster or individual tracking&#x27;, &#x27;DISASTER&#x27;)]], value=&#x27;RESET&#x27;),
+        html.Label(&#x27;Exact breed search&#x27;), dcc.Input(id=&#x27;breed&#x27;, type=&#x27;text&#x27;, debounce=True),
+        html.Div(id=&#x27;status&#x27;, role=&#x27;status&#x27;),
+        dash_table.DataTable(id=&#x27;animals&#x27;, columns=[{&#x27;name&#x27;: f.replace(&#x27;_&#x27;, &#x27; &#x27;).title(), &#x27;id&#x27;: f} for f in sorted(FIELDS)],
+            data=[], page_action=&#x27;custom&#x27;, page_current=0, page_size=10, page_count=0,
+            sort_action=&#x27;custom&#x27;, sort_mode=&#x27;single&#x27;, sort_by=[], row_selectable=&#x27;single&#x27;, selected_rows=[],
+            style_table={&#x27;overflowX&#x27;: &#x27;auto&#x27;}, style_cell={&#x27;textAlign&#x27;: &#x27;left&#x27;}),
+        dcc.Graph(id=&#x27;summary&#x27;), html.Div(id=&#x27;map&#x27;)
+    ], style={&#x27;maxWidth&#x27;: &#x27;1200px&#x27;, &#x27;margin&#x27;: &#x27;24px auto&#x27;})
+
+    @app.callback(Output(&#x27;animals&#x27;, &#x27;data&#x27;), Output(&#x27;animals&#x27;, &#x27;page_count&#x27;),
+                  Output(&#x27;animals&#x27;, &#x27;page_current&#x27;), Output(&#x27;animals&#x27;, &#x27;selected_rows&#x27;),
+                  Output(&#x27;summary&#x27;, &#x27;figure&#x27;), Output(&#x27;status&#x27;, &#x27;children&#x27;),
+                  Input(&#x27;rescue&#x27;, &#x27;value&#x27;), Input(&#x27;breed&#x27;, &#x27;value&#x27;),
+                  Input(&#x27;animals&#x27;, &#x27;page_current&#x27;), Input(&#x27;animals&#x27;, &#x27;sort_by&#x27;))
+    def refresh(rescue, breed, page, sorting):
+        if ctx.triggered_id in {&#x27;rescue&#x27;, &#x27;breed&#x27;}:
+            page = 0
+        filters = {&#x27;breed&#x27;: breed.strip()} if breed and breed.strip() else {}
+        order = sorting[0] if sorting else {&#x27;column_id&#x27;: &#x27;animal_id&#x27;, &#x27;direction&#x27;: &#x27;asc&#x27;}
+        try:
+            result = db.read_page(rescue, filters, page=page or 0, sort_field=order[&#x27;column_id&#x27;],
+                                  direction=-1 if order[&#x27;direction&#x27;] == &#x27;desc&#x27; else 1)
+            summary = db.summary(rescue, filters)
+            figure = go.Figure(go.Bar(x=[x.get(&#x27;category&#x27;) or &#x27;Unknown&#x27; for x in summary],
+                                     y=[x[&#x27;count&#x27;] for x in summary]))
+            figure.update_layout(title=&#x27;Top 10 breeds across all matching records&#x27;)
+            return result[&#x27;records&#x27;], result[&#x27;page_count&#x27;], result[&#x27;page&#x27;], [], figure, f&quot;{result[&#x27;total&#x27;]} matching records&quot;
+        except (ValueError, DatabaseError) as error:
+            return [], 0, 0, [], go.Figure(), str(error)
+
+    @app.callback(Output(&#x27;map&#x27;, &#x27;children&#x27;), Input(&#x27;animals&#x27;, &#x27;data&#x27;), Input(&#x27;animals&#x27;, &#x27;selected_rows&#x27;))
+    def update_map(records, selected):
+        if not records:
+            return html.P(&#x27;No map data available.&#x27;)
+        index = selected[0] if selected and 0 &lt;= selected[0] &lt; len(records) else 0
+        record = records[index]
+        lat, lon = record.get(&#x27;location_lat&#x27;), record.get(&#x27;location_long&#x27;)
+        if not all(isinstance(x, (int, float)) and math.isfinite(x) for x in (lat, lon)) or not (-90 &lt;= lat &lt;= 90 and -180 &lt;= lon &lt;= 180):
+            return html.P(&#x27;Selected animal has no valid location.&#x27;)
+        return dl.Map([dl.TileLayer(), dl.Marker(position=[lat, lon], children=[
+            dl.Tooltip(str(record.get(&#x27;breed&#x27;, &#x27;Unknown&#x27;))),
+            dl.Popup(str(record.get(&#x27;name&#x27;, &#x27;Unnamed animal&#x27;)))])],
+            center=[lat, lon], zoom=10, style={&#x27;height&#x27;: &#x27;400px&#x27;})
+    return app
+
+
+if __name__ == &#x27;__main__&#x27;:
+    db = AnimalShelter()
+    atexit.register(db.close)
+    create_app(db).run(debug=False)
+</code></pre></section></main><footer>Trevor Powers · Southern New Hampshire University · 2026</footer></body></html>

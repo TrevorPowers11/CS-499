@@ -1,0 +1,54 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>algorithms/enhanced/animal_index.py | Trevor Powers</title><meta name="description" content="Trevor Powers CS 499 computer science portfolio with original and enhanced code, narratives, and code review."><link rel="stylesheet" href="../style.css"></head><body><a class="skip" href="#main">Skip to content</a><header class="hero"><div class="container"><p class="eyebrow">CS 499 Computer Science Capstone</p><h1>Trevor Powers</h1><h2>algorithms/enhanced/animal_index.py</h2><nav aria-label="Main navigation"><a href="../index.html">Portfolio home</a><a href="../index.html#artifacts">Artifacts</a><a href="../setup.html">Setup and testing</a></nav></div></header><main id="main" class="container"><section class="card"><h2>algorithms/enhanced/animal_index.py</h2><p><a href="../algorithms_code.html">Back to source list</a></p><pre><code>&quot;&quot;&quot;In-memory search, filtering and sorting for shelter dashboard records.&quot;&quot;&quot;
+
+from collections import defaultdict
+
+RESCUE = {
+    &quot;WATER&quot;: ({&quot;Labrador Retriever Mix&quot;, &quot;Chesapeake Bay Retriever&quot;, &quot;Newfoundland&quot;}, &quot;Intact Female&quot;, 26, 156),
+    &quot;MOUNTAIN&quot;: ({&quot;German Shepherd&quot;, &quot;Alaskan Malamute&quot;, &quot;Old English Sheepdog&quot;, &quot;Siberian Husky&quot;, &quot;Rottweiler&quot;}, &quot;Intact Male&quot;, 26, 156),
+    &quot;DISASTER&quot;: ({&quot;Doberman Pinscher&quot;, &quot;German Shepherd&quot;, &quot;Golden Retriever&quot;, &quot;Bloodhound&quot;, &quot;Rottweiler&quot;}, &quot;Intact Male&quot;, 20, 300),
+}
+SORT_FIELDS = {&quot;animal_id&quot;, &quot;name&quot;, &quot;breed&quot;, &quot;age_upon_outcome_in_weeks&quot;}
+
+
+class AnimalIndex:
+    &quot;&quot;&quot;Build hash buckets once; use them for repeated exact-match queries.&quot;&quot;&quot;
+
+    def __init__(self, records):
+        self.records = [{k: v for k, v in row.items() if k != &quot;_id&quot;} for row in records]
+        self.by_breed = defaultdict(list)
+        self.by_id = defaultdict(list)
+        for position, row in enumerate(self.records):
+            self.by_breed[row.get(&quot;breed&quot;)].append(position)
+            self.by_id[row.get(&quot;animal_id&quot;)].append(position)
+
+    def search(self, rescue=&quot;RESET&quot;, animal_id=&quot;&quot;, breed=&quot;&quot;, sort_by=&quot;animal_id&quot;, descending=False):
+        &quot;&quot;&quot;Intersect indexed candidates, then apply the remaining conditions.&quot;&quot;&quot;
+        if rescue not in (*RESCUE, &quot;RESET&quot;):
+            raise ValueError(&quot;Unknown rescue type&quot;)
+        if sort_by not in SORT_FIELDS:
+            raise ValueError(&quot;Unsupported sort field&quot;)
+        buckets = []
+        if animal_id and animal_id.strip():
+            buckets.append(set(self.by_id.get(animal_id.strip(), ())))
+        if breed and breed.strip():
+            buckets.append(set(self.by_breed.get(breed.strip(), ())))
+        if rescue != &quot;RESET&quot;:
+            breeds, sex, minimum, maximum = RESCUE[rescue]
+            buckets.append(set().union(*(self.by_breed.get(b, ()) for b in breeds)))
+        candidates = sorted(set.intersection(*buckets)) if buckets else range(len(self.records))
+        results = []
+        for position in candidates:
+            row = self.records[position]
+            if rescue != &quot;RESET&quot;:
+                if row.get(&quot;animal_type&quot;) != &quot;Dog&quot; or row.get(&quot;sex_upon_outcome&quot;) != sex:
+                    continue
+                age = row.get(&quot;age_upon_outcome_in_weeks&quot;)
+                if not isinstance(age, (int, float)) or not minimum &lt;= age &lt;= maximum:
+                    continue
+            results.append(row)
+        # Missing values stay last in either direction; Python&#x27;s sort is stable.
+        present = [r for r in results if r.get(sort_by) is not None]
+        missing = [r for r in results if r.get(sort_by) is None]
+        present.sort(key=lambda r: str(r[sort_by]).casefold() if sort_by != &quot;age_upon_outcome_in_weeks&quot; else float(r[sort_by]), reverse=descending)
+        return present + missing
+</code></pre></section></main><footer>Trevor Powers · Southern New Hampshire University · 2026</footer></body></html>
